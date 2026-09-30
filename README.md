@@ -32,13 +32,13 @@ Optional attributes on the `div`:
 1. Commit changes, then tag a new version (`git tag v1.0.1 && git push --tags`).
 2. `@1` in the embed URL follows the newest `1.x` tag. jsDelivr can cache for up to 12 hours; to update sooner, visit `https://purge.jsdelivr.net/gh/ehballah/oga-pledge-map@1/dist/pledge-map.js`.
 
-The map data can be rebuilt with `data-build/build.sh` (needs `mapshaper` and Python's `shapely`).
+The map data can be rebuilt with `data-build/build.sh` (needs `mapshaper`).
 
 ## Data sources
 
 - Municipal boundaries: Statistics Canada, 2021 Census boundary files (census subdivisions, cartographic). Contains information licensed under the Open Government Licence – Canada. First Nations reserves and unorganized areas are drawn but not selectable, since they don't hold municipal elections.
 - Lakes: Statistics Canada, 2016 Census lakes and rivers (polygons). Contains information licensed under the Open Government Licence – Canada. Every lake of 20 km² or more south of 46°N is shown (Lake Simcoe, Lake Scugog, the Kawarthas, Muskoka and others), plus lakes of 150 km² or more further north.
-- Greenbelt outer boundary: Ontario GeoHub. Contains information licensed under the Open Government Licence – Ontario. The line on the map is smoothed for display, so it's approximate at close zoom. A municipality counts as a Greenbelt municipality if at least 1 km² of it is inside the real, unsmoothed boundary (62 municipalities).
+- Greenbelt outer boundary: Ontario GeoHub. Contains information licensed under the Open Government Licence – Ontario. Shown at its full official shape, including the Urban River Valleys, with light simplification. A municipality counts as a Greenbelt municipality if at least 1 km² of it is inside the boundary (62 municipalities).
 - Hamilton Township (Northumberland) is renamed in the data so it doesn't clash with the City of Hamilton.
 
 ## Testing locally

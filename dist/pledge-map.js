@@ -1,10 +1,10 @@
 /*!
- * OGA Pledge Map v1.1.0
+ * OGA Pledge Map v1.1.1
  * Choropleth of Greenbelt pledge signees by Ontario municipality, linked to the
  * Finsweet municipality search on greenbeltalliance.ca/sign-the-candidate-pledge.
  * Boundaries: Statistics Canada 2021 (Open Government Licence – Canada)
  * Lakes: Statistics Canada 2016 lakes and rivers (Open Government Licence – Canada)
- * Greenbelt boundary: Ontario GeoHub (Open Government Licence – Ontario), smoothed for display
+ * Greenbelt boundary: Ontario GeoHub (Open Government Licence – Ontario)
  */
 (function () {
   'use strict';

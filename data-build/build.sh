@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Rebuilds dist/ontario.json from the official sources.
-# Needs: curl, unzip, node, python3 with shapely (pip install shapely), mapshaper (npm i -g mapshaper).
+# Needs: curl, unzip, node, mapshaper (npm i -g mapshaper).
 set -euo pipefail
 cd "$(dirname "$0")"
 STATCAN=https://www12.statcan.gc.ca/census-recensement
@@ -13,11 +13,9 @@ LCC='+proj=lcc +lat_1=49 +lat_2=77 +lat_0=63.390675 +lon_0=-91.86666666666666 +x
 mapshaper lhy_000c16a_e.shp -filter '/(^|,)35(,|$)/.test(PRUID)' -each 'km=this.area/1e6' -filter 'km>=20' \
   -proj wgs84 -each 'lat=this.centroidY' -filter 'lat<46 || km>=150' -proj "$LCC" -dissolve -o lakes.shp
 
-# Greenbelt: dissolve, remove lakes, smooth for display
+# Greenbelt: dissolve, remove lakes, light simplification (original shape kept, incl. urban river valleys)
 mapshaper gb.geojson -dissolve -proj "$LCC" -o gb_lcc.shp
-mapshaper gb_lcc.shp -erase lakes.shp -o format=geojson gb_nolake.json
-python3 smooth_greenbelt.py gb_nolake.json gb_smooth.json
-mapshaper -i gb_smooth.json -proj init="$LCC" wgs84 -o gb_smooth_wgs.json
+mapshaper gb_lcc.shp -erase lakes.shp -simplify interval=150 keep-shapes -proj wgs84 -o format=geojson gb_wgs.json
 
 # Greenbelt municipalities: >= 1 km2 inside the real (unsmoothed) boundary
 mapshaper lcsd000b21a_e.shp -filter 'PRUID=="35" && ["IRI","NO","S-É"].indexOf(CSDTYPE)<0' -clip gb_lcc.shp \
@@ -28,7 +26,7 @@ mapshaper -i lcsd000b21a_e.shp -filter 'PRUID=="35"' -erase lakes.shp \
   -each "cd=CSDUID.slice(0,4); m=['IRI','NO','S-É'].indexOf(CSDTYPE)<0?1:0; gb=[$IDS].indexOf(CSDUID)>=0?1:0" \
   -simplify interval=250 keep-shapes -filter-slivers min-area=0.5km2 -proj wgs84 \
   -each 'id=CSDUID; name=CSDNAME' -filter-fields id,name,cd,m,gb -rename-layers munis \
-  -i gb_smooth_wgs.json -rename-layers greenbelt \
+  -i gb_wgs.json -rename-layers greenbelt \
   -o format=topojson quantization=1e5 target=munis,greenbelt ontario.topojson
 node -e '
 const fs=require("fs");const t=JSON.parse(fs.readFileSync("ontario.topojson","utf8"));
@@ -38,4 +36,4 @@ fs.writeFileSync("../dist/ontario.json",JSON.stringify(t));
 const gb=t.objects.munis.geometries.filter(g=>g.properties.gb&&g.properties.m).map(g=>g.properties.name).sort();
 console.log("Wrote dist/ontario.json. Greenbelt municipalities ("+gb.length+") — paste into GREENBELT in pledge-map.js if changed:");
 console.log(JSON.stringify(gb));'
-rm -f csd.zip lhy.zip lcsd000b21a_e.* lhy_000c16a_e.* lakes.* gb.geojson gb_lcc.* gb_nolake.json gb_smooth*.json gb_overlap.csv ontario.topojson
+rm -f csd.zip lhy.zip lcsd000b21a_e.* lhy_000c16a_e.* lakes.* gb.geojson gb_lcc.* gb_wgs.json gb_overlap.csv ontario.topojson
