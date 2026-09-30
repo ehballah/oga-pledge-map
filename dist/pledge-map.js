@@ -1,9 +1,10 @@
 /*!
- * OGA Pledge Map v1.0.1
+ * OGA Pledge Map v1.1.0
  * Choropleth of Greenbelt pledge signees by Ontario municipality, linked to the
  * Finsweet municipality search on greenbeltalliance.ca/sign-the-candidate-pledge.
  * Boundaries: Statistics Canada 2021 (Open Government Licence – Canada)
- * Greenbelt boundary: Ontario GeoHub (Open Government Licence – Ontario)
+ * Lakes: Statistics Canada 2016 lakes and rivers (Open Government Licence – Canada)
+ * Greenbelt boundary: Ontario GeoHub (Open Government Licence – Ontario), smoothed for display
  */
 (function () {
   'use strict';
@@ -23,7 +24,7 @@
 
   var C = { // OGA brand
     m0: '#DDE5D8', other: '#E9EEE6', m1: '#BFD4A6', m2: '#85A85E', m3: '#4B6A2E',
-    stroke: '#FFFFFF', upper: '#3A4554', gb: '#A6550F', sel: '#1F2A36', hover: '#3A4554'
+    stroke: '#FFFFFF', upper: '#3A4554', gb: '#B8860B', gbHalo: '#FFFFFF', water: '#C6DCE7', sel: '#1F2A36', hover: '#3A4554'
   };
 
   var CSS = [
@@ -36,21 +37,23 @@
     '.pm-sub{font-size:14px;color:#7D8793}',
     '.pm-bar{height:6px;border-radius:3px;background:#DDE5D8;overflow:hidden;margin-top:8px}',
     '.pm-bar i{display:block;height:100%;background:#698C46;border-radius:3px}',
-    '.pm-shell{position:relative;border-radius:10px;overflow:hidden;border:1px solid #DCE5D8;background:#DCE8EC}',
-    '.pm-map{height:480px;background:#DCE8EC}',
-    '.pm .leaflet-container{font-family:inherit;background:#DCE8EC}',
+    '.pm-shell{position:relative;border-radius:10px;overflow:hidden;border:1px solid #DCE5D8;background:#C6DCE7}',
+    '.pm-map{height:480px;background:#C6DCE7}',
+    '.pm .leaflet-container{font-family:inherit;background:#C6DCE7}',
     '.pm-legend{position:absolute;left:12px;bottom:12px;z-index:500;background:#fff;border:1px solid #DCE5D8;border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.3;display:flex;flex-direction:column;gap:6px;box-shadow:0 1px 4px rgba(0,0,0,.08);text-align:left}',
     '.pm-legend b{font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#5B6675}',
     '.pm-legend span{display:flex;align-items:center;gap:8px}',
     '.pm-sw{width:18px;height:12px;border-radius:2px;border:1px solid rgba(0,0,0,.08);flex:none}',
-    '.pm-sw.pm-gbsw{background:transparent;border:2px dashed #A6550F}',
+    '.pm-sw.pm-gbsw{background:#DDE5D8;border:0;position:relative}',
+    '.pm-sw.pm-gbsw:after{content:"";position:absolute;left:0;right:0;top:5px;height:2px;background:#B8860B;box-shadow:0 0 0 1px rgba(255,255,255,.7)}',
+    '.pm-sw.pm-water{background:#C6DCE7}',
     '.pm-reset{position:absolute;right:12px;top:12px;z-index:500;background:#fff;color:#3A4554;border:1px solid #DCE5D8;border-radius:6px;padding:7px 12px;font-family:inherit;font-size:14px;font-weight:600;line-height:1.2;cursor:pointer}',
     '.pm-reset:hover{border-color:#698C46}.pm-reset:focus-visible{outline:3px solid #698C46;outline-offset:2px}',
     '.pm-hint{font-size:14px;color:#7D8793;text-align:center;margin:-8px 0 0}',
     '.pm-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#5B6675;font-size:15px}',
     '.leaflet-tooltip.pm-tip{background:#fff;color:#3A4554;border:1px solid #DCE5D8;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.15);padding:8px 10px;font-size:14px;line-height:1.35;text-align:left}',
     '.leaflet-tooltip.pm-tip:before{display:none}',
-    '.pm-tip b{font-size:15px}.pm-tip .pm-c{color:#4B6A2E;font-weight:600}.pm-tip .pm-z{color:#7D8793}.pm-tip .pm-tag{color:#A6550F;font-size:12px;font-weight:600}',
+    '.pm-tip b{font-size:15px}.pm-tip .pm-c{color:#4B6A2E;font-weight:600}.pm-tip .pm-z{color:#7D8793}.pm-tip .pm-tag{color:#8A6508;font-size:12px;font-weight:600}',
     '.pm .leaflet-control-attribution{font-size:11px;color:#7D8793}',
     '.pm .leaflet-bar,.pm .leaflet-touch .leaflet-bar{border:1px solid #DCE5D8;border-radius:6px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;padding:0;margin:12px 0 0 12px}',
     '.pm .leaflet-bar a,.pm .leaflet-touch .leaflet-bar a{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:34px;height:34px;margin:0;padding:0;border:0;border-radius:0;background:#fff;color:#3A4554;font-family:inherit;font-size:20px;font-weight:600;line-height:1;text-decoration:none}',
@@ -120,7 +123,7 @@
           '<span><i class="pm-sw" style="background:' + C.m2 + '"></i>2 to 4</span>' +
           '<span><i class="pm-sw" style="background:' + C.m1 + '"></i>1</span>' +
           '<span><i class="pm-sw" style="background:' + C.m0 + '"></i>None yet</span>' +
-          '<span><i class="pm-sw pm-gbsw"></i>Greenbelt boundary</span>' +
+          '<span><i class="pm-sw pm-gbsw"></i>Greenbelt</span>' +
         '</div>' +
       '</div>' +
       '<p class="pm-hint">Click a municipality to see its candidates, or search below.</p>';
@@ -209,8 +212,9 @@
 
       var upperLayer = L.geoJSON(topojson.mesh(topo, topo.objects.munis, function (a, b) { return a !== b && a.properties.cd !== b.properties.cd; }),
         { interactive: false, style: { color: C.upper, weight: 1, opacity: .45 } }).addTo(map);
-      var gbLayer = L.geoJSON(topojson.feature(topo, topo.objects.greenbelt),
-        { interactive: false, style: { color: C.gb, weight: 1.6, dashArray: '5 4', fill: false, opacity: .8 } }).addTo(map);
+      var gbShape = topojson.feature(topo, topo.objects.greenbelt);
+      L.geoJSON(gbShape, { interactive: false, style: { color: C.gbHalo, weight: 4, opacity: .7, fill: false, lineJoin: 'round' } }).addTo(map);
+      L.geoJSON(gbShape, { interactive: false, style: { color: C.gb, weight: 1.75, opacity: 1, fill: false, lineJoin: 'round' } }).addTo(map);
 
       var signed = munis.features.filter(function (f) { return f.properties.count > 0; });
       var home = signed.length
