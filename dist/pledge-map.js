@@ -1,5 +1,5 @@
 /*!
- * OGA Pledge Map v1.0.0
+ * OGA Pledge Map v1.0.1
  * Choropleth of Greenbelt pledge signees by Ontario municipality, linked to the
  * Finsweet municipality search on greenbeltalliance.ca/sign-the-candidate-pledge.
  * Boundaries: Statistics Canada 2021 (Open Government Licence – Canada)
@@ -52,6 +52,12 @@
     '.leaflet-tooltip.pm-tip:before{display:none}',
     '.pm-tip b{font-size:15px}.pm-tip .pm-c{color:#4B6A2E;font-weight:600}.pm-tip .pm-z{color:#7D8793}.pm-tip .pm-tag{color:#A6550F;font-size:12px;font-weight:600}',
     '.pm .leaflet-control-attribution{font-size:11px;color:#7D8793}',
+    '.pm .leaflet-bar,.pm .leaflet-touch .leaflet-bar{border:1px solid #DCE5D8;border-radius:6px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;padding:0;margin:12px 0 0 12px}',
+    '.pm .leaflet-bar a,.pm .leaflet-touch .leaflet-bar a{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:34px;height:34px;margin:0;padding:0;border:0;border-radius:0;background:#fff;color:#3A4554;font-family:inherit;font-size:20px;font-weight:600;line-height:1;text-decoration:none}',
+    '.pm .leaflet-bar a + a{border-top:1px solid #DCE5D8}',
+    '.pm .leaflet-bar a:hover{background:#F5FAF5;color:#4B6A2E}',
+    '.pm .leaflet-bar a:focus-visible{outline:3px solid #698C46;outline-offset:-3px}',
+    '.pm .leaflet-bar a.leaflet-disabled{color:#B7C1B5;background:#fff;cursor:default}',
     '@media (max-width:640px){.pm-stats{grid-template-columns:1fr}.pm-stat{flex-direction:row;flex-wrap:wrap;align-items:baseline;column-gap:12px}.pm-lbl{margin-top:0}.pm-sub,.pm-bar{flex-basis:100%}.pm-map{height:380px}.pm-legend{font-size:12px;padding:8px 10px}}'
   ].join('\n');
 
@@ -168,14 +174,29 @@
       map.on('click focus', function () { map.scrollWheelZoom.enable(); });
       mapEl.addEventListener('mouseleave', function () { map.scrollWheelZoom.disable(); });
 
+      // Outlines for hover/selection are drawn in their own pane above all fills and borders,
+      // so neighbouring shapes can never paint over part of the line.
+      map.createPane('pmHighlight');
+      map.getPane('pmHighlight').style.zIndex = 450;
+      map.getPane('pmHighlight').style.pointerEvents = 'none';
+      var hlRenderer = L.svg({ pane: 'pmHighlight' });
+      var hoverOutline = null, selOutline = null;
+      function outline(f, color) {
+        return L.geoJSON(f, { pane: 'pmHighlight', renderer: hlRenderer, interactive: false,
+          style: { color: color, weight: 3, opacity: 1, fill: false, lineJoin: 'round', lineCap: 'round' } }).addTo(map);
+      }
+
       var selected = null;
       var muniLayer = L.geoJSON(munis, {
         style: styleFor,
         onEachFeature: function (f, l) {
           if (!f.properties.m) return;
-          l.bindTooltip(function () { return tip(f.properties); }, { sticky: true, className: 'pm-tip', direction: 'top', offset: [0, -8] });
-          l.on('mouseover', function () { if (l !== selected) l.setStyle({ weight: 2, color: C.hover }); });
-          l.on('mouseout', function () { if (l !== selected) muniLayer.resetStyle(l); });
+          l.bindTooltip(function () { return tip(f.properties); }, { sticky: true, className: 'pm-tip', direction: 'top', offset: [0, -8], opacity: 1 });
+          l.on('mouseover', function () {
+            if (hoverOutline) hoverOutline.remove();
+            hoverOutline = l === selected ? null : outline(f, C.hover);
+          });
+          l.on('mouseout', function () { if (hoverOutline) { hoverOutline.remove(); hoverOutline = null; } });
           l.on('click', function () {
             if (input) {
               input.value = f.properties.name;
@@ -207,13 +228,15 @@
       function layerFor(f) { var hit = null; muniLayer.eachLayer(function (l) { if (l.feature === f) hit = l; }); return hit; }
       function select(f, fromMap) {
         var l = layerFor(f); if (!l) return;
-        if (selected && selected !== l) muniLayer.resetStyle(selected);
         selected = l;
-        l.setStyle({ weight: 3, color: C.sel }); l.bringToFront(); upperLayer.bringToFront(); gbLayer.bringToFront();
+        if (selOutline) selOutline.remove();
+        if (hoverOutline) { hoverOutline.remove(); hoverOutline = null; }
+        selOutline = outline(f, C.sel);
         if (!fromMap || !map.getBounds().contains(l.getBounds())) map.flyToBounds(l.getBounds(), { maxZoom: 10, padding: [40, 40], duration: .8 });
       }
       function clear(zoomOut) {
-        if (selected) { muniLayer.resetStyle(selected); selected = null; }
+        selected = null;
+        if (selOutline) { selOutline.remove(); selOutline = null; }
         if (zoomOut) map.flyToBounds(home, { duration: .8 });
       }
 
