@@ -1,5 +1,5 @@
 /*!
- * OGA Pledge Map v1.1.1
+ * OGA Pledge Map v1.2.0
  * Choropleth of Greenbelt pledge signees by Ontario municipality, linked to the
  * Finsweet municipality search on greenbeltalliance.ca/sign-the-candidate-pledge.
  * Boundaries: Statistics Canada 2021 (Open Government Licence – Canada)
@@ -82,15 +82,29 @@
     if (!root || root.getAttribute('data-ready')) return;
     root.setAttribute('data-ready', '1');
 
+    var style = document.createElement('style'); style.textContent = CSS; document.head.appendChild(style);
+
+    // The candidate list is paginated past Webflow's 100-items-per-list limit and Finsweet
+    // CMS Load adds the later pages after load. The site's ogaCards helper resolves
+    // allLoaded once every card is on the page; wait for it so the counts are complete.
+    // Without the helper (e.g. a test page), count straight away.
+    var waitFor = window.ogaCards && window.ogaCards.allLoaded;
+    if (waitFor && typeof waitFor.then === 'function') waitFor.then(render, render);
+    else render();
+  }
+
+  function render() {
+    var root = document.getElementById('oga-pledge-map');
+    if (!root || root.getAttribute('data-rendered')) return;
+    root.setAttribute('data-rendered', '1');
+
     var opt = {
       data: root.getAttribute('data-src') || BASE + 'ontario.json',
       search: root.getAttribute('data-search') || '#muni-search-field',
       field: root.getAttribute('data-field') || '[data-field="municipality"]'
     };
 
-    var style = document.createElement('style'); style.textContent = CSS; document.head.appendChild(style);
-
-    // ---- Counts, read from the candidate cards already on the page ----
+    // ---- Counts, read from the candidate cards on the page ----
     var counts = {}, displayName = {};
     var seen = new Set();
     document.querySelectorAll(opt.field).forEach(function (e) {
