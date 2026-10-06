@@ -1,5 +1,5 @@
 /*!
- * OGA Pledge Map v1.2.0
+ * OGA Pledge Map v1.3.0
  * Choropleth of Greenbelt pledge signees by Ontario municipality, linked to the
  * Finsweet municipality search on greenbeltalliance.ca/sign-the-candidate-pledge.
  * Boundaries: Statistics Canada 2021 (Open Government Licence – Canada)
@@ -23,9 +23,20 @@
   var UPPER = {"3501":"United Counties of SD&G","3502":"United Counties of Prescott and Russell","3507":"United Counties of Leeds and Grenville","3509":"Lanark County","3510":"Frontenac County","3511":"Lennox and Addington County","3512":"Hastings County","3514":"Northumberland County","3515":"Peterborough County","3518":"Durham Region","3519":"York Region","3521":"Peel Region","3522":"Dufferin County","3523":"Wellington County","3524":"Halton Region","3526":"Niagara Region","3530":"Waterloo Region","3531":"Perth County","3532":"Oxford County","3534":"Elgin County","3537":"Essex County","3538":"Lambton County","3539":"Middlesex County","3540":"Huron County","3541":"Bruce County","3542":"Grey County","3543":"Simcoe County","3544":"District of Muskoka","3546":"Haliburton County","3547":"Renfrew County"};
 
   var C = { // OGA brand
-    m0: '#DDE5D8', other: '#E9EEE6', m1: '#BFD4A6', m2: '#85A85E', m3: '#4B6A2E',
+    m0: '#DDE5D8', other: '#E9EEE6',
     stroke: '#FFFFFF', upper: '#3A4554', gb: '#B8860B', gbHalo: '#FFFFFF', water: '#C6DCE7', sel: '#1F2A36', hover: '#3A4554'
   };
+
+  // Shading steps: each step roughly doubles the one before, so new signees in
+  // small municipalities still show up while the busiest stand apart.
+  // min = lowest count in the step; edit here to change the breaks.
+  var STEPS = [
+    { min: 16, fill: '#2E5219', label: '16 or more' },
+    { min: 8,  fill: '#4D7A31', label: '8 to 15' },
+    { min: 4,  fill: '#739E4E', label: '4 to 7' },
+    { min: 2,  fill: '#9DC07A', label: '2 or 3' },
+    { min: 1,  fill: '#BBD49A', label: '1' }
+  ];
 
   var CSS = [
     '.pm{display:flex;flex-direction:column;gap:18px;margin:8px 0 24px;font-family:inherit;color:#3A4554}',
@@ -68,7 +79,7 @@
     return String(s || '').toLowerCase()
       .replace(/,?\s*(on|ontario)(,?\s*canada)?$/, '')
       .replace(/^(the )?(city|town|township|municipality|village) of\s+/, '')
-      .replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim();
+      .replace(/[-–—]/g, ' ').replace(/\s+/g, ' ').trim(); // hyphens and spaces count as the same
   }
   function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -133,9 +144,7 @@
         '<div class="pm-loading">Loading map…</div>' +
         '<button class="pm-reset" type="button">Show all</button>' +
         '<div class="pm-legend" aria-hidden="true"><b>Candidates signed</b>' +
-          '<span><i class="pm-sw" style="background:' + C.m3 + '"></i>5 or more</span>' +
-          '<span><i class="pm-sw" style="background:' + C.m2 + '"></i>2 to 4</span>' +
-          '<span><i class="pm-sw" style="background:' + C.m1 + '"></i>1</span>' +
+          STEPS.map(function (s) { return '<span><i class="pm-sw" style="background:' + s.fill + '"></i>' + s.label + '</span>'; }).join('') +
           '<span><i class="pm-sw" style="background:' + C.m0 + '"></i>None yet</span>' +
           '<span><i class="pm-sw pm-gbsw"></i>Greenbelt</span>' +
         '</div>' +
@@ -177,7 +186,7 @@
       var missing = Object.keys(counts).filter(function (k) { return !byName[k]; });
       if (missing.length) console.warn('[pledge map] no boundary found for:', missing.map(function (k) { return displayName[k]; }));
 
-      var fillFor = function (c) { return c >= 5 ? C.m3 : c >= 2 ? C.m2 : c >= 1 ? C.m1 : C.m0; };
+      var fillFor = function (c) { for (var i = 0; i < STEPS.length; i++) if (c >= STEPS[i].min) return STEPS[i].fill; return C.m0; };
       var styleFor = function (f) {
         var p = f.properties;
         return p.m ? { fillColor: fillFor(p.count), fillOpacity: 1, color: C.stroke, weight: .6 }
@@ -199,8 +208,9 @@
       var hlRenderer = L.svg({ pane: 'pmHighlight' });
       var hoverOutline = null, selOutline = null;
       function outline(f, color) {
-        return L.geoJSON(f, { pane: 'pmHighlight', renderer: hlRenderer, interactive: false,
-          style: { color: color, weight: 3, opacity: 1, fill: false, lineJoin: 'round', lineCap: 'round' } }).addTo(map);
+        var opts = function (c, w) { return { pane: 'pmHighlight', renderer: hlRenderer, interactive: false,
+          style: { color: c, weight: w, opacity: 1, fill: false, lineJoin: 'round', lineCap: 'round' } }; };
+        return L.layerGroup([L.geoJSON(f, opts('#FFFFFF', 5.5)), L.geoJSON(f, opts(color, 3))]).addTo(map);
       }
 
       var selected = null;
