@@ -16,16 +16,25 @@ Add a **Code Embed** element directly under the "View Candidates in Your Municip
 
 ```html
 <div id="oga-pledge-map"></div>
-<script defer src="https://cdn.jsdelivr.net/gh/ehballah/oga-pledge-map@1/dist/pledge-map.js"></script>
+<script defer src="https://cdn.jsdelivr.net/gh/ehballah/oga-pledge-map@COMMIT/dist/pledge-map.js"></script>
+<script defer src="https://cdn.jsdelivr.net/gh/ehballah/oga-pledge-map@COMMIT/dist/show-more.js"></script>
 ```
 
-Optional attributes on the `div`:
+Replace `COMMIT` with the latest commit hash (or `1` once a v1 release exists).
+
+Optional attributes on the map's `div`:
 
 | Attribute | Default |
 |---|---|
 | `data-search` | `#muni-search-field` |
 | `data-field` | `[data-field="municipality"]` |
 | `data-src` | `ontario.json` next to the script |
+
+### Show more (`dist/show-more.js`)
+
+Shows the first 24 candidate cards with **Show 24 more** and **Show all** buttons under the list. Every card stays on the page (only hidden), so the map's counts, the Finsweet search and the card scripts keep working. While a search is active, or a municipality is selected on the map, every match shows and the buttons hide. Cards added later by Finsweet CMS Load are picked up automatically.
+
+Optional attributes on its `<script>` tag: `data-step` (cards per click, default 24), `data-list` (default `[fs-cmsfilter-element="list"]`), `data-search` (default `#muni-search-field`). To remove it, delete that one `<script>` line.
 
 ## Updating
 
