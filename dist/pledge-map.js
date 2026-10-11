@@ -1,5 +1,5 @@
 /*!
- * OGA Pledge Map v1.3.0
+ * OGA Pledge Map v1.4.0
  * Choropleth of Greenbelt pledge signees by Ontario municipality, linked to the
  * Finsweet municipality search on greenbeltalliance.ca/sign-the-candidate-pledge.
  * Boundaries: Statistics Canada 2021 (Open Government Licence – Canada)
@@ -31,12 +31,34 @@
   // small municipalities still show up while the busiest stand apart.
   // min = lowest count in the step; edit here to change the breaks.
   var STEPS = [
-    { min: 16, fill: '#2E5219', label: '16 or more' },
-    { min: 8,  fill: '#4D7A31', label: '8 to 15' },
-    { min: 4,  fill: '#739E4E', label: '4 to 7' },
-    { min: 2,  fill: '#9DC07A', label: '2 or 3' },
+    { min: 32, fill: '#1E3F07', label: '32 or more' },
+    { min: 16, fill: '#365C1F', label: '16 to 31' },
+    { min: 8,  fill: '#4E7B32', label: '8 to 15' },
+    { min: 4,  fill: '#6E994A', label: '4 to 7' },
+    { min: 2,  fill: '#92B76F', label: '2 or 3' },
     { min: 1,  fill: '#BBD49A', label: '1' }
   ];
+
+  // Former municipalities and communities that candidates sometimes enter instead of
+  // the current municipality. Keys are lower case; spaces and hyphens are equivalent.
+  var ALIASES = {
+    // Toronto (amalgamated 1998)
+    'scarborough': 'toronto', 'north york': 'toronto', 'etobicoke': 'toronto',
+    'york': 'toronto', 'east york': 'toronto', 'old toronto': 'toronto',
+    // Hamilton (amalgamated 2001)
+    'stoney creek': 'hamilton', 'ancaster': 'hamilton', 'dundas': 'hamilton',
+    'flamborough': 'hamilton', 'glanbrook': 'hamilton', 'binbrook': 'hamilton', 'waterdown': 'hamilton',
+    // Kawartha Lakes
+    'bobcaygeon': 'kawartha lakes', 'lindsay': 'kawartha lakes', 'fenelon falls': 'kawartha lakes',
+    'omemee': 'kawartha lakes', 'coboconk': 'kawartha lakes',
+    // Other common communities
+    'bolton': 'caledon', 'keswick': 'georgina', 'sutton': 'georgina',
+    'bowmanville': 'clarington', 'courtice': 'clarington', 'newcastle': 'clarington',
+    'woodbridge': 'vaughan', 'maple': 'vaughan', 'concord': 'vaughan', 'kleinburg': 'vaughan',
+    'unionville': 'markham', 'alcona': 'innisfil',
+    'stouffville': 'whitchurch stouffville', 'port perry': 'scugog',
+    'kanata': 'ottawa', 'nepean': 'ottawa', 'orleans': 'ottawa'
+  };
 
   var CSS = [
     '.pm{display:flex;flex-direction:column;gap:18px;margin:8px 0 24px;font-family:inherit;color:#3A4554}',
@@ -77,10 +99,11 @@
 
   function norm(s) {
     return String(s || '').toLowerCase()
-      .replace(/,?\s*(on|ontario)(,?\s*canada)?$/, '')
+      .replace(/(,\s*|\s+)(on|ont|ontario)(,?\s*canada)?$/, '') // ", ON" suffix only, not names ending in "on"
       .replace(/^(the )?(city|town|township|municipality|village) of\s+/, '')
       .replace(/[-–—]/g, ' ').replace(/\s+/g, ' ').trim(); // hyphens and spaces count as the same
   }
+  function canon(s) { var k = norm(s); return ALIASES[k] || k; }
   function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function loadScript(src) {
@@ -121,7 +144,7 @@
     document.querySelectorAll(opt.field).forEach(function (e) {
       if (seen.has(e)) return; seen.add(e);
       if (e.closest('#oga-pledge-map')) return;
-      var raw = e.textContent.trim(), k = norm(raw);
+      var raw = e.textContent.trim(), k = canon(raw);
       if (!k) return;
       counts[k] = (counts[k] || 0) + 1; displayName[k] = displayName[k] || raw;
     });
@@ -275,11 +298,11 @@
 
       if (input) {
         input.addEventListener('input', function () {
-          var k = norm(input.value);
+          var k = canon(input.value);
           if (!k) return clear(true);
           if (byName[k]) select(byName[k], false);
         });
-        if (input.value && byName[norm(input.value)]) select(byName[norm(input.value)], false);
+        if (input.value && byName[canon(input.value)]) select(byName[canon(input.value)], false);
       } else {
         console.warn('[pledge map] search field not found:', opt.search);
       }
