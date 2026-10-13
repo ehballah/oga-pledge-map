@@ -20,6 +20,10 @@ mapshaper gb_lcc.shp -erase lakes.shp -simplify interval=150 keep-shapes -proj w
 # Greenbelt municipalities: >= 1 km2 inside the real (unsmoothed) boundary
 mapshaper lcsd000b21a_e.shp -filter 'PRUID=="35" && ["IRI","NO","S-É"].indexOf(CSDTYPE)<0' -clip gb_lcc.shp \
   -each 'gbkm=this.area/1e6' -filter-fields CSDUID,gbkm -o format=csv gb_overlap.csv
+# Greenbelt-area municipalities: outside the Greenbelt, >= 1 km2 of land within 20 km of it
+mapshaper gb_lcc.shp -dissolve -buffer 20000 -o gb20.shp
+mapshaper lcsd000b21a_e.shp -filter 'PRUID=="35" && ["IRI","NO","S-É"].indexOf(CSDTYPE)<0' -erase lakes.shp -clip gb20.shp \
+  -each 'km=this.area/1e6' -filter-fields CSDUID,CSDNAME,km -o format=csv near20.csv
 IDS=$(node -e 'const r=require("fs").readFileSync("gb_overlap.csv","utf8").trim().split("\n").slice(1);const a={};r.forEach(l=>{const[id,k]=l.split(",");a[id]=(a[id]||0)+ +k});console.log(Object.keys(a).filter(k=>a[k]>=1).map(k=>JSON.stringify(k)).join(","))')
 
 mapshaper -i lcsd000b21a_e.shp -filter 'PRUID=="35"' -erase lakes.shp \
@@ -35,5 +39,10 @@ t.objects.greenbelt.geometries.forEach(g=>g.properties={});
 fs.writeFileSync("../dist/ontario.json",JSON.stringify(t));
 const gb=t.objects.munis.geometries.filter(g=>g.properties.gb&&g.properties.m).map(g=>g.properties.name).sort();
 console.log("Wrote dist/ontario.json. Greenbelt municipalities ("+gb.length+") — paste into GREENBELT in pledge-map.js if changed:");
-console.log(JSON.stringify(gb));'
-rm -f csd.zip lhy.zip lcsd000b21a_e.* lhy_000c16a_e.* lakes.* gb.geojson gb_lcc.* gb_wgs.json gb_overlap.csv ontario.topojson
+console.log(JSON.stringify(gb));
+const gbIds=new Set(t.objects.munis.geometries.filter(g=>g.properties.gb&&g.properties.m).map(g=>g.properties.id));
+const a={};fs.readFileSync("near20.csv","utf8").trim().split("\n").slice(1).forEach(l=>{const p=l.split(",");const km=+p.pop();const id=p.shift();a[id]=a[id]||{n:p.join(",").replace(/^"|"$/g,""),km:0};a[id].km+=km});
+const near=Object.keys(a).filter(id=>a[id].km>=1&&!gbIds.has(id)).map(id=>a[id].n).sort();
+console.log("Nearby municipalities ("+near.length+") — paste into NEAR in pledge-map.js if changed:");
+console.log(JSON.stringify(near));'
+rm -f csd.zip lhy.zip lcsd000b21a_e.* lhy_000c16a_e.* lakes.* gb.geojson gb_lcc.* gb_wgs.json gb_overlap.csv gb20.* near20.csv ontario.topojson

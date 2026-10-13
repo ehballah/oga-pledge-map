@@ -46,6 +46,7 @@ The map data can be rebuilt with `data-build/build.sh` (needs `mapshaper`).
 ## Data sources
 
 - Municipal boundaries: Statistics Canada, 2021 Census boundary files (census subdivisions, cartographic). Contains information licensed under the Open Government Licence – Canada. First Nations reserves and unorganized areas are drawn but not selectable, since they don't hold municipal elections.
+- Stat tiles: **Candidates signed** (all cards), **Greenbelt-area municipalities** (the 62 Greenbelt municipalities plus 37 with at least 1 km² of land within 20 km of the Greenbelt, 99 in all, roughly the municipalities OGA reached out to) and **Greenbelt municipalities** (62). Signees from municipalities outside the area still count in the first tile.
 - Lakes: Statistics Canada, 2016 Census lakes and rivers (polygons). Contains information licensed under the Open Government Licence – Canada. Every lake of 20 km² or more south of 46°N is shown (Lake Simcoe, Lake Scugog, the Kawarthas, Muskoka and others), plus lakes of 150 km² or more further north.
 - Greenbelt outer boundary: Ontario GeoHub. Contains information licensed under the Open Government Licence – Ontario. Shown at its full official shape, including the Urban River Valleys, with light simplification. A municipality counts as a Greenbelt municipality if at least 1 km² of it is inside the boundary (62 municipalities).
 - Hamilton Township (Northumberland) is renamed in the data so it doesn't clash with the City of Hamilton.
