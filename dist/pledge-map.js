@@ -1,5 +1,5 @@
 /*!
- * OGA Pledge Map v1.5.0
+ * OGA Pledge Map v1.6.0
  * Choropleth of Greenbelt pledge signees by Ontario municipality, linked to the
  * Finsweet municipality search on greenbeltalliance.ca/sign-the-candidate-pledge.
  * Boundaries: Statistics Canada 2021 (Open Government Licence – Canada)
@@ -18,7 +18,10 @@
   // Greenbelt municipalities (≥1 km² inside the Greenbelt outer boundary). Kept here so the
   // stats can show before the map data loads. Rebuild with data-build/ if boundaries change.
   var GREENBELT = ["Adjala-Tosorontio","Ajax","Alnwick/Haldimand","Amaranth","Aurora","Bradford West Gwillimbury","Brampton","Brock","Burlington","Caledon","Cavan Monaghan","Chatsworth","Clarington","Clearview","Cramahe","East Garafraxa","East Gwillimbury","Erin","Georgian Bluffs","Georgina","Grey Highlands","Grimsby","Halton Hills","Hamilton","Hamilton Township","Innisfil","Kawartha Lakes","King","Lincoln","Markham","Meaford","Milton","Mississauga","Mono","Mulmur","New Tecumseth","Newmarket","Niagara Falls","Niagara-on-the-Lake","North Dumfries","Northern Bruce Peninsula","Oakville","Orangeville","Oshawa","Owen Sound","Pelham","Pickering","Port Hope","Puslinch","Richmond Hill","Scugog","South Bruce Peninsula","St. Catharines","The Blue Mountains","Thorold","Toronto","Trent Hills","Uxbridge","Vaughan","West Lincoln","Whitby","Whitchurch-Stouffville"];
-  var ONTARIO_MUNIS = 414;
+  // Municipalities outside the Greenbelt with at least 1 km2 of land within 20 km of it.
+  // With GREENBELT this makes the ~100 municipalities OGA reached out to (the "Greenbelt area").
+  // Rebuild with data-build/build.sh if boundaries change.
+  var NEAR = ["Arran-Elderslie","Asphodel-Norwood","Barrie","Brant","Brantford","Brighton","Cambridge","Centre Wellington","Cobourg","Collingwood","Douro-Dummer","Essa","Fort Erie","Grand Valley","Guelph","Guelph/Eramosa","Haldimand County","Havelock-Belmont-Methuen","Kitchener","Melancthon","Northeastern Manitoulin and the Islands","Oro-Medonte","Otonabee-South Monaghan","Peterborough","Port Colborne","Quinte West","Ramara","Selwyn","Shelburne","Southgate","Springwater","Wainfleet","Wasaga Beach","Welland","Wellington North","West Grey","Woolwich"];
 
   var UPPER = {"3501":"United Counties of SD&G","3502":"United Counties of Prescott and Russell","3507":"United Counties of Leeds and Grenville","3509":"Lanark County","3510":"Frontenac County","3511":"Lennox and Addington County","3512":"Hastings County","3514":"Northumberland County","3515":"Peterborough County","3518":"Durham Region","3519":"York Region","3521":"Peel Region","3522":"Dufferin County","3523":"Wellington County","3524":"Halton Region","3526":"Niagara Region","3530":"Waterloo Region","3531":"Perth County","3532":"Oxford County","3534":"Elgin County","3537":"Essex County","3538":"Lambton County","3539":"Middlesex County","3540":"Huron County","3541":"Bruce County","3542":"Grey County","3543":"Simcoe County","3544":"District of Muskoka","3546":"Haliburton County","3547":"Renfrew County"};
 
@@ -159,6 +162,9 @@
     Object.keys(counts).forEach(function (k) { total += counts[k]; muniCount++; });
     var gbSet = {}; GREENBELT.forEach(function (n) { gbSet[norm(n)] = 1; });
     var gbSigned = Object.keys(counts).filter(function (k) { return gbSet[k]; }).length;
+    var areaSet = {}; GREENBELT.concat(NEAR).forEach(function (n) { areaSet[norm(n)] = 1; });
+    var areaTotal = Object.keys(areaSet).length;
+    var areaSigned = Object.keys(counts).filter(function (k) { return areaSet[k]; }).length;
 
     // ---- Exact municipality match ----
     // Finsweet's search matches any card whose municipality *contains* the typed text,
@@ -205,7 +211,8 @@
     root.innerHTML =
       '<div class="pm-stats" role="group" aria-label="Pledge totals">' +
         '<div class="pm-stat"><span class="pm-num">' + total + '</span><span class="pm-lbl">Candidates signed</span><span class="pm-sub">across ' + muniCount + ' municipalit' + (muniCount === 1 ? 'y' : 'ies') + '</span></div>' +
-        '<div class="pm-stat"><span class="pm-num">' + muniCount + '</span><span class="pm-lbl">Municipalities represented</span><span class="pm-sub">of ' + ONTARIO_MUNIS + ' in Ontario</span></div>' +
+        '<div class="pm-stat"><span class="pm-num">' + areaSigned + ' <small>of ' + areaTotal + '</small></span><span class="pm-lbl">Greenbelt-area municipalities</span><span class="pm-sub">in or within 20 km of the Greenbelt</span>' +
+          '<div class="pm-bar" aria-hidden="true"><i style="width:' + (100 * areaSigned / areaTotal).toFixed(1) + '%"></i></div></div>' +
         '<div class="pm-stat"><span class="pm-num">' + gbSigned + ' <small>of ' + GREENBELT.length + '</small></span><span class="pm-lbl">Greenbelt municipalities</span><span class="pm-sub">have at least one candidate signed</span>' +
           '<div class="pm-bar" aria-hidden="true"><i style="width:' + (100 * gbSigned / GREENBELT.length).toFixed(1) + '%"></i></div></div>' +
       '</div>' +
