@@ -1,5 +1,5 @@
 /*!
- * OGA Pledge Map v1.4.0
+ * OGA Pledge Map v1.5.0
  * Choropleth of Greenbelt pledge signees by Ontario municipality, linked to the
  * Finsweet municipality search on greenbeltalliance.ca/sign-the-candidate-pledge.
  * Boundaries: Statistics Canada 2021 (Open Government Licence – Canada)
@@ -57,8 +57,13 @@
     'woodbridge': 'vaughan', 'maple': 'vaughan', 'concord': 'vaughan', 'kleinburg': 'vaughan',
     'unionville': 'markham', 'alcona': 'innisfil',
     'stouffville': 'whitchurch stouffville', 'port perry': 'scugog',
-    'kanata': 'ottawa', 'nepean': 'ottawa', 'orleans': 'ottawa'
+    'kanata': 'ottawa', 'nepean': 'ottawa', 'orleans': 'ottawa',
+    'hillsburgh': 'erin', 'ballinafad': 'erin'
   };
+
+  // Names shown in the map tooltip where the census name alone is ambiguous
+  // (e.g. the Town of Erin vs. the village of Erin inside it). Keys are norm()ed.
+  var DISPLAY = { 'erin': 'Town of Erin' };
 
   var CSS = [
     '.pm{display:flex;flex-direction:column;gap:18px;margin:8px 0 24px;font-family:inherit;color:#3A4554}',
@@ -87,6 +92,7 @@
     '.leaflet-tooltip.pm-tip{background:#fff;color:#3A4554;border:1px solid #DCE5D8;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.15);padding:8px 10px;font-size:14px;line-height:1.35;text-align:left}',
     '.leaflet-tooltip.pm-tip:before{display:none}',
     '.pm-tip b{font-size:15px}.pm-tip .pm-c{color:#4B6A2E;font-weight:600}.pm-tip .pm-z{color:#7D8793}.pm-tip .pm-tag{color:#8A6508;font-size:12px;font-weight:600}',
+    '.pm-out{display:none!important}',
     '.pm .leaflet-control-attribution{font-size:11px;color:#7D8793}',
     '.pm .leaflet-bar,.pm .leaflet-touch .leaflet-bar{border:1px solid #DCE5D8;border-radius:6px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;padding:0;margin:12px 0 0 12px}',
     '.pm .leaflet-bar a,.pm .leaflet-touch .leaflet-bar a{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:34px;height:34px;margin:0;padding:0;border:0;border-radius:0;background:#fff;color:#3A4554;font-family:inherit;font-size:20px;font-weight:600;line-height:1;text-decoration:none}',
@@ -139,7 +145,7 @@
     };
 
     // ---- Counts, read from the candidate cards on the page ----
-    var counts = {}, displayName = {};
+    var counts = {}, displayName = {}, cards = [];
     var seen = new Set();
     document.querySelectorAll(opt.field).forEach(function (e) {
       if (seen.has(e)) return; seen.add(e);
@@ -147,11 +153,52 @@
       var raw = e.textContent.trim(), k = canon(raw);
       if (!k) return;
       counts[k] = (counts[k] || 0) + 1; displayName[k] = displayName[k] || raw;
+      cards.push({ el: e.closest('.w-dyn-item') || e.parentNode, k: k });
     });
     var total = 0, muniCount = 0;
     Object.keys(counts).forEach(function (k) { total += counts[k]; muniCount++; });
     var gbSet = {}; GREENBELT.forEach(function (n) { gbSet[norm(n)] = 1; });
     var gbSigned = Object.keys(counts).filter(function (k) { return gbSet[k]; }).length;
+
+    // ---- Exact municipality match ----
+    // Finsweet's search matches any card whose municipality *contains* the typed text,
+    // so "Erin" also brings up Pickering and "Milton" brings up Hamilton. Once the search
+    // text is a whole municipality name (typed, or set by clicking the map), hide the
+    // cards for other municipalities too. Partial typing ("Mil") is left to Finsweet.
+    var known = {}; Object.keys(counts).forEach(function (k) { known[k] = 1; });
+    GREENBELT.forEach(function (n) { known[norm(n)] = 1; });
+    var searchEl = document.querySelector(opt.search);
+    var fsEmpty = document.querySelector('[fs-cmsfilter-element="empty"]');
+    var ownEmpty = null;
+    if (fsEmpty) {
+      ownEmpty = fsEmpty.cloneNode(true);
+      ownEmpty.removeAttribute('fs-cmsfilter-element');
+      ownEmpty.removeAttribute('id');
+      ownEmpty.style.display = 'none';
+      fsEmpty.parentNode.insertBefore(ownEmpty, fsEmpty.nextSibling);
+    }
+    var exactTimers = [];
+    function applyExact() {
+      var k = searchEl ? canon(searchEl.value) : '';
+      var on = !!(k && known[k]);
+      var left = 0;
+      cards.forEach(function (c) {
+        var out = on && c.k !== k;
+        c.el.classList.toggle('pm-out', out);
+        if (!out && c.el.isConnected) left++;
+      });
+      if (ownEmpty) {
+        var fsShown = fsEmpty.isConnected && getComputedStyle(fsEmpty).display !== 'none';
+        ownEmpty.style.display = on && left === 0 && !fsShown ? 'block' : 'none';
+      }
+    }
+    function scheduleExact() {
+      exactTimers.forEach(clearTimeout);
+      // Finsweet re-renders the list a moment after each keystroke; check again once it has
+      exactTimers = [0, 150, 400, 900].map(function (ms) { return setTimeout(applyExact, ms); });
+    }
+    if (searchEl) searchEl.addEventListener('input', scheduleExact);
+    function addKnown(names) { names.forEach(function (n) { known[norm(n)] = 1; }); applyExact(); }
 
     // ---- Markup ----
     root.classList.add('pm');
@@ -206,6 +253,7 @@
         p.count = p.m ? (counts[k] || 0) : 0;
         if (p.m) byName[k] = f;
       });
+      addKnown(Object.keys(byName));
       var missing = Object.keys(counts).filter(function (k) { return !byName[k]; });
       if (missing.length) console.warn('[pledge map] no boundary found for:', missing.map(function (k) { return displayName[k]; }));
 
@@ -274,7 +322,7 @@
       function tip(p) {
         var up = UPPER[p.cd] ? '<br><span class="pm-z">' + UPPER[p.cd] + '</span>' : '';
         var c = p.count ? '<span class="pm-c">' + p.count + ' candidate' + (p.count > 1 ? 's' : '') + ' signed</span>' : '<span class="pm-z">No candidates yet</span>';
-        return '<b>' + esc(p.name) + '</b>' + up + '<br>' + c + (p.gb ? '<br><span class="pm-tag">In the Greenbelt</span>' : '');
+        return '<b>' + esc(DISPLAY[norm(p.name)] || p.name) + '</b>' + up + '<br>' + c + (p.gb ? '<br><span class="pm-tag">In the Greenbelt</span>' : '');
       }
       function layerFor(f) { var hit = null; muniLayer.eachLayer(function (l) { if (l.feature === f) hit = l; }); return hit; }
       function select(f, fromMap) {
