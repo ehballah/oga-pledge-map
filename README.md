@@ -29,6 +29,7 @@ Optional attributes on the map's `div`:
 | `data-search` | `#muni-search-field` |
 | `data-field` | `[data-field="municipality"]` |
 | `data-src` | `ontario.json` next to the script |
+| `data-counts` | not set. Set to `final` to use the frozen counts in `dist/counts-final-2026.json` (or a URL to any `{"counts": {"Municipality": n}}` file) instead of reading cards. Clicking a municipality and the search link are turned off, and the wording changes to past tense. Used after the pledge closed on October 26, 2026, so the candidate cards could come off the page. |
 
 ### Show more (`dist/show-more.js`)
 

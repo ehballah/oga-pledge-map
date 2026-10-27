@@ -127,6 +127,17 @@
 
     var style = document.createElement('style'); style.textContent = CSS; document.head.appendChild(style);
 
+    // Counts-only mode: data-counts="<url of a {counts:{name:n}} JSON>" uses a fixed set of
+    // counts instead of reading candidate cards, and turns off click-to-filter and search.
+    var countsSrc = root.getAttribute('data-counts');
+    if (countsSrc) {
+      if (countsSrc === 'final') countsSrc = BASE + 'counts-final-2026.json';
+      fetch(countsSrc).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (d) { render(d.counts || d); })
+        .catch(function (e) { console.error('[pledge map] failed to load counts', e); });
+      return;
+    }
+
     // The candidate list is paginated past Webflow's 100-items-per-list limit and Finsweet
     // CMS Load adds the later pages after load. The site's ogaCards helper resolves
     // allLoaded once every card is on the page; wait for it so the counts are complete.
@@ -136,10 +147,11 @@
     else render();
   }
 
-  function render() {
+  function render(fixed) {
     var root = document.getElementById('oga-pledge-map');
     if (!root || root.getAttribute('data-rendered')) return;
     root.setAttribute('data-rendered', '1');
+    var final = !!(fixed && typeof fixed === 'object');
 
     var opt = {
       data: root.getAttribute('data-src') || BASE + 'ontario.json',
@@ -150,7 +162,11 @@
     // ---- Counts, read from the candidate cards on the page ----
     var counts = {}, displayName = {}, cards = [];
     var seen = new Set();
-    document.querySelectorAll(opt.field).forEach(function (e) {
+    if (final) Object.keys(fixed).forEach(function (raw) {
+      var k = canon(raw); if (!k) return;
+      counts[k] = (counts[k] || 0) + (+fixed[raw] || 0); displayName[k] = displayName[k] || raw;
+    });
+    if (!final) document.querySelectorAll(opt.field).forEach(function (e) {
       if (seen.has(e)) return; seen.add(e);
       if (e.closest('#oga-pledge-map')) return;
       var raw = e.textContent.trim(), k = canon(raw);
@@ -173,8 +189,8 @@
     // cards for other municipalities too. Partial typing ("Mil") is left to Finsweet.
     var known = {}; Object.keys(counts).forEach(function (k) { known[k] = 1; });
     GREENBELT.forEach(function (n) { known[norm(n)] = 1; });
-    var searchEl = document.querySelector(opt.search);
-    var fsEmpty = document.querySelector('[fs-cmsfilter-element="empty"]');
+    var searchEl = final ? null : document.querySelector(opt.search);
+    var fsEmpty = final ? null : document.querySelector('[fs-cmsfilter-element="empty"]');
     var ownEmpty = null;
     if (fsEmpty) {
       ownEmpty = fsEmpty.cloneNode(true);
@@ -217,16 +233,16 @@
           '<div class="pm-bar" aria-hidden="true"><i style="width:' + (100 * gbSigned / GREENBELT.length).toFixed(1) + '%"></i></div></div>' +
       '</div>' +
       '<div class="pm-shell">' +
-        '<div class="pm-map" role="region" aria-label="Map of Ontario municipalities shaded by the number of candidates who signed the pledge. Use the municipality search below to find a municipality."></div>' +
+        '<div class="pm-map" role="region" aria-label="Map of Ontario municipalities shaded by the number of candidates who signed the pledge' + (final ? ' before it closed on October 26, 2026.' : '. Use the municipality search below to find a municipality.') + '"></div>' +
         '<div class="pm-loading">Loading map…</div>' +
-        '<button class="pm-reset" type="button">Show all</button>' +
+        (final ? '' : '<button class="pm-reset" type="button">Show all</button>') +
         '<div class="pm-legend" aria-hidden="true"><b>Candidates signed</b>' +
           STEPS.map(function (s) { return '<span><i class="pm-sw" style="background:' + s.fill + '"></i>' + s.label + '</span>'; }).join('') +
-          '<span><i class="pm-sw" style="background:' + C.m0 + '"></i>None yet</span>' +
+          '<span><i class="pm-sw" style="background:' + C.m0 + '"></i>' + (final ? 'None' : 'None yet') + '</span>' +
           '<span><i class="pm-sw pm-gbsw"></i>Greenbelt</span>' +
         '</div>' +
       '</div>' +
-      '<p class="pm-hint">Click a municipality to see its candidates, or search below.</p>';
+      '<p class="pm-hint">' + (final ? 'Hover over or tap a municipality to see how many of its candidates signed the pledge.' : 'Click a municipality to see its candidates, or search below.') + '</p>';
 
     var mapEl = root.querySelector('.pm-map');
     var loadingEl = root.querySelector('.pm-loading');
@@ -252,7 +268,7 @@
 
     function buildMap(topo) {
       var L = window.L, topojson = window.topojson;
-      var input = document.querySelector(opt.search);
+      var input = final ? null : document.querySelector(opt.search);
       var munis = topojson.feature(topo, topo.objects.munis);
       var byName = {};
       munis.features.forEach(function (f) {
@@ -302,7 +318,7 @@
             hoverOutline = l === selected ? null : outline(f, C.hover);
           });
           l.on('mouseout', function () { if (hoverOutline) { hoverOutline.remove(); hoverOutline = null; } });
-          l.on('click', function () {
+          if (!final) l.on('click', function () {
             if (input) {
               input.value = f.properties.name;
               input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -328,7 +344,7 @@
 
       function tip(p) {
         var up = UPPER[p.cd] ? '<br><span class="pm-z">' + UPPER[p.cd] + '</span>' : '';
-        var c = p.count ? '<span class="pm-c">' + p.count + ' candidate' + (p.count > 1 ? 's' : '') + ' signed</span>' : '<span class="pm-z">No candidates yet</span>';
+        var c = p.count ? '<span class="pm-c">' + p.count + ' candidate' + (p.count > 1 ? 's' : '') + ' signed</span>' : '<span class="pm-z">' + (final ? 'No candidates signed' : 'No candidates yet') + '</span>';
         return '<b>' + esc(DISPLAY[norm(p.name)] || p.name) + '</b>' + up + '<br>' + c + (p.gb ? '<br><span class="pm-tag">In the Greenbelt</span>' : '');
       }
       function layerFor(f) { var hit = null; muniLayer.eachLayer(function (l) { if (l.feature === f) hit = l; }); return hit; }
@@ -346,6 +362,7 @@
         if (zoomOut) map.flyToBounds(home, { duration: .8 });
       }
 
+      if (final) return;
       root.querySelector('.pm-reset').addEventListener('click', function () {
         if (input) { input.value = ''; input.dispatchEvent(new Event('input', { bubbles: true })); }
         clear(true);
